@@ -4,7 +4,9 @@ import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.PROD
+  ? 'https://cng-backend.azurewebsites.net/api'  // URL DE PRODUCCIÓN
+  : 'http://localhost:7292/api';
 
 // Datos
 const usuarios = ref([])
