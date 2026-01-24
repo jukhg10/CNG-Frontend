@@ -3,9 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 // --- 1. CONFIGURACIÓN Y ESTADO ---
-const API_URL = import.meta.env.PROD
-  ? 'https://cng-backend.azurewebsites.net/api'  // URL DE PRODUCCIÓN
-  : 'http://localhost:7292/api';
+const API_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api'                 // Si la barra dice localhost, usa local
+  : 'https://cng-backend.azurewebsites.net/api';
 
 const router = useRouter()
 const usuarioLogueado = ref({ nombre: 'Usuario' })
