@@ -154,9 +154,14 @@ const subirArchivo = async (event) => {
 
   try {
     // 1. Subimos el físico a Azure
-    const respuesta = await axios.post('http://localhost:7292/api/SubirDocumento', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    const urlSubida = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api/SubirDocumento'
+  : 'https://cng-backend.azurewebsites.net/api/SubirDocumento';
+
+// 2. Usamos esa variable
+const respuesta = await axios.post(urlSubida, formData, {
+   headers: { 'Content-Type': 'multipart/form-data' }
+});
 
     // 2. Agregamos a la lista visual para que el usuario edite el nombre
     // Nota: Usamos Date.now() como ID temporal para evitar problemas de borrado con Vue
