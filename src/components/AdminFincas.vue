@@ -165,11 +165,17 @@ const respuesta = await axios.post(urlSubida, formData, {
 
     // 2. Agregamos a la lista visual para que el usuario edite el nombre
     // Nota: Usamos Date.now() como ID temporal para evitar problemas de borrado con Vue
+    if (!formFinca.value.documentos) {
+      formFinca.value.documentos = [];
+    }
+    // ------------------------
+
+    // Ahora sí es seguro hacer el push
     formFinca.value.documentos.push({
       tempId: Date.now(),
-      nombreArchivo: archivo.name, // Nombre original por defecto
+      nombreArchivo: archivo.name,
       url: respuesta.data.url
-    })
+    });
 
     // Limpiamos el input para poder subir otro
     event.target.value = ''
