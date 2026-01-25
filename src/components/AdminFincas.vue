@@ -7,13 +7,18 @@ const API_URL = window.location.hostname.includes('localhost')
   ? 'http://localhost:7292/api/Fincas'
   : 'https://cng-backend.azurewebsites.net/api/Fincas';
 
+  const BASE_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api'
+  : 'https://cng-backend.azurewebsites.net/api';
+
+const FINCAS_URL = `${BASE_URL}/Fincas`;
+
 const router = useRouter()
 const usuarioLogueado = ref({ nombre: 'Usuario' })
 const fincas = ref([])
 const cargando = ref(false)
 const mostrarModal = ref(false)
 const guardando = ref(false)
-const subiendoArchivo = ref(false) // <--- NUEVO: Estado para la subida
 
 // Filtros de búsqueda
 const filtroNombre = ref('')
@@ -29,7 +34,6 @@ const formatearFecha = (fecha) => {
 const listaFases = ['Diagnostico', 'Implementacion', 'Seguimiento', 'Retiro']
 const categoriasGanado = ['Vaca parida','Vaca preñada','Vaca Vacia', 'Novilla', 'Ternero', 'Toro', 'Macho de ceba', 'Búfalo']
 
-// --- 2. MODELO DE DATOS (FORMULARIO) ---
 const formFinca = ref({
   id: null,
   nombre: '',
@@ -44,13 +48,11 @@ const formFinca = ref({
   tipoProduccion: '',
   asistioEvento: false,
   documentos: [],
-  // --- NUEVO: LOS 4 PILARES ---
   pilarProductivo: 0,
   pilarSocioEconomico: 0,
   pilarAmbiental: 0,
   pilarParticipacion: 0,
 
-  // Lista de animales (Relación 1 a muchos)
   inventario: []
 })
 
@@ -60,6 +62,30 @@ const inventarioTemp = ref({
   cantidad: 0
 });
 
+const archivosPendientes = ref([]);
+const subiendoArchivos = ref(false); // Para mostrar un spinner de carga
+
+// Función que se dispara al elegir archivos en el <input>
+const prepararArchivo = (event) => {
+    const files = Array.from(event.target.files); // Convertimos a array real
+    if (!files.length) return;
+
+    files.forEach(file => {
+        archivosPendientes.value.push({
+            // Generamos un ID único para que el borrado no falle
+            id: Math.random().toString(36).substring(2, 9),
+            file: file,
+            nombre: file.name, // Este campo ahora será reactivo y editable
+            tamano: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+        });
+    });
+    event.target.value = '';
+};
+
+const quitarPendiente = (id) => {
+    // Filtramos por ID en lugar de índice para evitar errores de posición
+    archivosPendientes.value = archivosPendientes.value.filter(arch => arch.id !== id);
+};
 // --- 3. FUNCIONES DE LÓGICA ---
 
 const cargarFincas = async () => {
@@ -79,38 +105,43 @@ const cerrarSesion = () => {
 }
 // 2. Guardar (Crear o Editar)
 const guardarFinca = async () => {
-  guardando.value = true
   try {
-    // 1. Creamos una copia de los datos para no modificar el formulario visual
-    const payload = { ...formFinca.value }
+    subiendoArchivos.value = true;
 
-    // 2. TRUCO CLAVE: Si el ID es null o vacío, LO BORRAMOS del paquete.
-    // Así C# generará uno nuevo automáticamente en lugar de chillar por el null.
-    if (!payload.id) {
-      delete payload.id
+    // 1. Subir archivos a la raíz de la API (No a /Fincas)
+    if (archivosPendientes.value.length > 0) {
+      for (const item of archivosPendientes.value) {
+        const formData = new FormData();
+        formData.append('archivo', item.file);
+
+        // USAMOS BASE_URL aquí para que la ruta sea /api/SubirDocumento
+        const res = await axios.post(`${BASE_URL}/SubirDocumento`, formData);
+
+        formFinca.value.documentos.push({
+          nombreArchivo: item.nombre, // El nombre que editaste en el input
+          url: res.data.url
+        });
+      }
     }
 
+    // 2. Guardar Finca (Usamos FINCAS_URL)
     if (formFinca.value.id) {
-      // Si TIENE id, es una ACTUALIZACIÓN (PUT)
-      await axios.put(API_URL, payload)
-      alert('¡Finca actualizada correctamente!')
+      await axios.put(FINCAS_URL, formFinca.value);
     } else {
-      // Si NO tiene id, es CREACIÓN (POST)
-      await axios.post(API_URL, payload)
-      alert('¡Finca creada exitosamente!')
+      await axios.post(FINCAS_URL, formFinca.value);
     }
 
-    cerrarModal()
-    cargarFincas()
+    archivosPendientes.value = [];
+    cerrarModal();
+    cargarFincas();
+    alert('Guardado exitosamente');
   } catch (error) {
-    console.error(error)
-    // Mostramos el mensaje exacto que devuelve el servidor si existe
-    const mensajeServidor = error.response && error.response.data ? error.response.data : error.message
-    alert('Error al guardar: ' + mensajeServidor)
+    console.error(error);
+    alert('Error en el proceso');
   } finally {
-    guardando.value = false
+    subiendoArchivos.value = false;
   }
-}
+};
 
 // 3. Eliminar
 const eliminarFinca = async (id) => {
@@ -149,50 +180,7 @@ const editarFinca = async (fincaSeleccionada) => {
   }
 }
 
-// --- NUEVO: FUNCIÓN PARA SUBIR ARCHIVO ---
-const subirArchivo = async (event) => {
-  const archivo = event.target.files[0]
-  if (!archivo) return
 
-  subiendoArchivo.value = true
-  const formData = new FormData()
-  formData.append('archivo', archivo)
-
-  try {
-    // 1. Subimos el físico a Azure
-    const urlSubida = window.location.hostname.includes('localhost')
-  ? 'http://localhost:7292/api/SubirDocumento'
-  : 'https://cng-backend.azurewebsites.net/api/SubirDocumento';
-
-// 2. Usamos esa variable
-const respuesta = await axios.post(urlSubida, formData, {
-   headers: { 'Content-Type': 'multipart/form-data' }
-});
-
-    // 2. Agregamos a la lista visual para que el usuario edite el nombre
-    // Nota: Usamos Date.now() como ID temporal para evitar problemas de borrado con Vue
-    if (!formFinca.value.documentos) {
-      formFinca.value.documentos = [];
-    }
-    // ------------------------
-
-    // Ahora sí es seguro hacer el push
-    formFinca.value.documentos.push({
-      tempId: Date.now(),
-      nombreArchivo: archivo.name,
-      url: respuesta.data.url
-    });
-
-    // Limpiamos el input para poder subir otro
-    event.target.value = ''
-
-  } catch (error) {
-    console.error(error)
-    alert("Error al subir archivo: " + error.message)
-  } finally {
-    subiendoArchivo.value = false
-  }
-}
 const quitarDocumento = (index) => {
   // Agregamos la confirmación nativa del navegador
   if (confirm("¿Estás seguro de que deseas eliminar este documento de la lista?")) {
@@ -530,40 +518,68 @@ onMounted(() => {
 </div>
             <div class="col-12 section-title mt-4">Documentación y Mapas</div>
 
-              <div class="col-12">
-                  <div class="mb-3">
-                      <label class="form-label small text-muted">Agregar nuevo documento:</label>
-                      <div class="input-group">
-                          <input type="file" @change="subirArchivo" class="form-control" :disabled="subiendoArchivo">
-                          <span v-if="subiendoArchivo" class="input-group-text bg-warning text-dark">⏳ Subiendo...</span>
-                      </div>
-                  </div>
+<div class="col-12">
+    <div class="mb-3">
+        <label class="form-label small text-muted">Seleccionar archivos para cargar:</label>
+        <div class="input-group">
+            <input type="file" @change="prepararArchivo" class="form-control" multiple :disabled="subiendoArchivos">
+            <span class="input-group-text bg-light text-primary">📎</span>
+        </div>
+        <small class="text-muted">Los archivos se subirán permanentemente al hacer clic en "Guardar Finca".</small>
+    </div>
 
-                  <div v-if="formFinca.documentos && formFinca.documentos.length > 0" class="card border-0 bg-light">
-                      <div class="card-body p-2">
-                          <div v-for="(doc, index) in formFinca.documentos" :key="doc.tempId || index" class="d-flex align-items-center mb-2 bg-white p-2 rounded border shadow-sm">
+    <div v-if="archivosPendientes.length > 0" class="mb-4">
+    <p class="small fw-bold text-warning mb-2">⚠️ Archivos por subir (puedes editar el nombre):</p>
 
-                              <div class="me-3 fs-4">📄</div>
+    <div v-for="arch in archivosPendientes" :key="arch.id"
+         class="d-flex align-items-center mb-2 bg-warning bg-opacity-10 p-2 rounded border border-warning shadow-sm">
 
-                              <div class="flex-grow-1 me-3">
-                                  <label class="form-label visually-hidden">Nombre del archivo</label>
-                                  <input
-                                    v-model="doc.nombreArchivo"
-                                    type="text"
-                                    class="form-control form-control-sm fw-bold text-primary"
-                                    placeholder="Nombre del documento..."
-                                  >
-                                  <a :href="doc.url" target="_blank" class="small text-muted text-decoration-none mt-1 d-inline-block">
-                                      👁️ Ver archivo original
-                                  </a>
-                              </div>
+        <div class="me-3 fs-4">📤</div>
 
-                              <button type="button" @click="quitarDocumento(index)" class="btn btn-outline-danger btn-sm" title="Quitar de la lista">
-                                  🗑️
-                              </button>
-                          </div>
-                      </div>
-                  </div>
+        <div class="flex-grow-1 me-3">
+            <input
+                v-model="arch.nombre"
+                type="text"
+                class="form-control form-control-sm fw-bold border-warning"
+                placeholder="Nombre del archivo..."
+            >
+            <div class="text-muted small" style="font-size: 0.7rem;">
+                Original: {{ arch.file.name }} | {{ arch.tamano }}
+            </div>
+        </div>
+
+        <button
+            type="button"
+            @click="quitarPendiente(arch.id)"
+            class="btn btn-sm btn-danger px-2"
+            title="Eliminar de la cola"
+        >
+            ✕
+        </button>
+    </div>
+</div>
+
+    <div v-if="formFinca.documentos && formFinca.documentos.length > 0">
+        <p class="small fw-bold text-success mb-1">✅ Documentos guardados en la finca:</p>
+        <div class="card border-0 bg-light">
+            <div class="card-body p-2">
+                <div v-for="(doc, index) in formFinca.documentos" :key="index"
+                     class="d-flex align-items-center mb-2 bg-white p-2 rounded border shadow-sm">
+                    <div class="me-3 fs-4">📄</div>
+                    <div class="flex-grow-1 me-3">
+                        <input v-model="doc.nombreArchivo" type="text" class="form-control form-control-sm fw-bold text-primary border-0 bg-transparent" placeholder="Nombre del documento...">
+                        <a :href="doc.url" target="_blank" class="small text-muted text-decoration-none mt-1 d-inline-block">
+                            👁️ Ver archivo original
+                        </a>
+                    </div>
+                    <button type="button" @click="quitarDocumento(index)" class="btn btn-outline-danger btn-sm">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
                   <div v-else class="text-center p-4 border border-dashed rounded text-muted">
                       <p class="mb-0 small">No hay documentos adjuntos todavía.</p>
