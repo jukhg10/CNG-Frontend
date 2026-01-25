@@ -5,8 +5,8 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const API_URL = window.location.hostname.includes('localhost')
-  ? 'http://localhost:7292/api/Usuarios'
-  : 'https://cng-backend.azurewebsites.net/api/Usuarios'
+  ? 'http://localhost:7292/api/Users'
+  : 'https://cng-backend.azurewebsites.net/api/Users'
 
 // Datos
 const usuarios = ref([])
