@@ -19,9 +19,15 @@ const subiendoArchivo = ref(false) // <--- NUEVO: Estado para la subida
 const filtroNombre = ref('')
 const filtroFase = ref('')
 
+const fechaSeleccionada = ref(new Date().toISOString().split('T')[0]); // Fecha global del formulario
+const formatearFecha = (fecha) => {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  return d.toLocaleDateString('es-CO');
+};
 // Listas de Opciones
 const listaFases = ['Diagnostico', 'Implementacion', 'Seguimiento', 'Retiro']
-const categoriasGanado = ['Vaca parida', 'Novilla', 'Ternera', 'Toro', 'Macho de ceba', 'Búfalo']
+const categoriasGanado = ['Vaca parida','Vaca preñada','Vaca Vacia', 'Novilla', 'Ternero', 'Toro', 'Macho de ceba', 'Búfalo']
 
 // --- 2. MODELO DE DATOS (FORMULARIO) ---
 const formFinca = ref({
@@ -52,7 +58,7 @@ const formFinca = ref({
 const inventarioTemp = ref({
   categoria: 'Vaca parida',
   cantidad: 0
-})
+});
 
 // --- 3. FUNCIONES DE LÓGICA ---
 
@@ -223,15 +229,17 @@ const cerrarModal = () => mostrarModal.value = false
 const agregarAnimal = () => {
   if (inventarioTemp.value.cantidad > 0) {
     formFinca.value.inventario.push({
+      fecha: fechaSeleccionada.value, // 👈 Toma la fecha de la variable global
       categoria: inventarioTemp.value.categoria,
       cantidad: inventarioTemp.value.cantidad
-    })
-    // Limpiar input de cantidad para el siguiente
-    inventarioTemp.value.cantidad = 0
+    });
+
+    // Limpiamos SOLO la cantidad para el siguiente animal
+    inventarioTemp.value.cantidad = 0;
   } else {
-    alert('La cantidad debe ser mayor a 0')
+    alert('La cantidad debe ser mayor a 0');
   }
-}
+};
 
 // Eliminar fila de la tabla local
 const borrarAnimal = (index) => {
@@ -408,7 +416,25 @@ onMounted(() => {
               </div>
               <div class="col-md-6">
                 <label class="form-label">Enlace Mapa (Texto)</label>
-                <input v-model="formFinca.restorUrl" type="text" class="form-control" placeholder="URL generada automáticamente abajo">
+                <div class="input-group">
+                  <input
+                    v-model="formFinca.restorUrl"
+                    type="text"
+                    class="form-control"
+                    placeholder="Pegue el link aquí"
+                  >
+
+                  <a
+                    v-if="formFinca.restorUrl"
+                    :href="formFinca.restorUrl"
+                    target="_blank"
+                    class="btn btn-outline-success"
+                    title="Probar enlace"
+                  >
+                    🌐 Abrir
+                  </a>
+                </div>
+                <small class="text-muted">Si el link es incorrecto, simplemente bórrelo y pegue uno nuevo arriba.</small>
               </div>
 
               <div class="col-12 section-title mt-4">Detalles Técnicos</div>
@@ -450,50 +476,58 @@ onMounted(() => {
 
               <div class="col-12 section-title mt-4">Inventario Ganadero</div>
 
-              <div class="col-12 bg-light p-3 rounded">
-                <div class="row g-2 align-items-end">
-                  <div class="col-md-5">
-                    <label class="form-label small text-muted">Categoría</label>
-                    <select v-model="inventarioTemp.categoria" class="form-select form-select-sm">
-                      <option v-for="cat in categoriasGanado" :key="cat" :value="cat">{{ cat }}</option>
-                    </select>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label small text-muted">Cantidad</label>
-                    <input v-model.number="inventarioTemp.cantidad" type="number" min="0" class="form-control form-control-sm">
-                  </div>
-                  <div class="col-md-4">
-                    <button type="button" @click="agregarAnimal" class="btn btn-sm btn-outline-success w-100">
-                      + Agregar
-                    </button>
-                  </div>
-                </div>
+<div class="col-12 bg-light p-3 rounded border">
+  <div class="row mb-3 pb-3 border-bottom">
+    <div class="col-md-6">
+      <label class="form-label fw-bold text-success">📅 Fecha del Conteo General</label>
+      <input v-model="fechaSeleccionada" type="date" class="form-control">
+      <small class="text-muted">Todos los animales que agregue abajo se registrarán para este día.</small>
+    </div>
+  </div>
 
-                <div v-if="formFinca.inventario.length > 0" class="mt-3 table-responsive bg-white border rounded">
-                  <table class="table table-sm mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th class="ps-3">Categoría</th>
-                        <th>Cant.</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(item, index) in formFinca.inventario" :key="index">
-                        <td class="ps-3">{{ item.categoria }}</td>
-                        <td class="fw-bold">{{ item.cantidad }}</td>
-                        <td class="text-end pe-3">
-                          <button type="button" @click="borrarAnimal(index)" class="btn btn-link text-danger p-0 text-decoration-none">×</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div v-else class="text-center mt-2 text-muted small">
-                  No se han agregado animales aún.
-                </div>
-              </div>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small text-muted">Categoría</label>
+      <select v-model="inventarioTemp.categoria" class="form-select form-select-sm">
+        <option v-for="cat in categoriasGanado" :key="cat" :value="cat">{{ cat }}</option>
+      </select>
+    </div>
 
+    <div class="col-md-3">
+      <label class="form-label small text-muted">Cantidad</label>
+      <input v-model.number="inventarioTemp.cantidad" type="number" min="0" class="form-control form-control-sm">
+    </div>
+
+    <div class="col-md-4">
+      <button type="button" @click="agregarAnimal" class="btn btn-sm btn-success w-100">
+        + Añadir a la lista
+      </button>
+    </div>
+  </div>
+
+  <div v-if="formFinca.inventario.length > 0" class="mt-3 table-responsive bg-white border rounded shadow-sm">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Fecha</th>
+          <th>Categoría</th>
+          <th>Cant.</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, index) in formFinca.inventario" :key="index">
+          <td class="ps-3 text-muted small">{{ formatearFecha(item.fecha) }}</td>
+          <td>{{ item.categoria }}</td>
+          <td class="fw-bold">{{ item.cantidad }}</td>
+          <td class="text-end pe-3">
+            <button type="button" @click="borrarAnimal(index)" class="btn btn-link text-danger p-0">×</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
             <div class="col-12 section-title mt-4">Documentación y Mapas</div>
 
               <div class="col-12">

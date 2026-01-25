@@ -3,10 +3,10 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
-// --- 1. DEFINIMOS LA URL AUTOMÁTICA ---
+// --- LÓGICA DE CONEXIÓN ---
 const API_URL = window.location.hostname.includes('localhost')
-  ? 'http://localhost:7292/api'                 // Si es local
-  : 'https://cng-backend.azurewebsites.net/api'; // Si es Azure
+  ? 'http://localhost:7292/api'
+  : 'https://cng-backend.azurewebsites.net/api';
 
 const router = useRouter()
 const email = ref('')
@@ -19,7 +19,6 @@ const login = async () => {
   errorMsg.value = ''
 
   try {
-    // --- 2. USAMOS LA VARIABLE AQUÍ ---
     const response = await axios.post(`${API_URL}/Login`, {
       email: email.value,
       password: password.value
@@ -27,12 +26,10 @@ const login = async () => {
 
     if (response.data) {
       localStorage.setItem('usuario', JSON.stringify(response.data))
-
-      // --- LÓGICA DE REDIRECCIÓN POR ROL ---
       if (response.data.rol === 'Admin') {
-        router.push('/admin') // El jefe va a la oficina
+        router.push('/admin')
       } else {
-        router.push('/inicio') // Los demás van al lobby
+        router.push('/inicio')
       }
     }
   } catch (error) {
@@ -49,147 +46,169 @@ const login = async () => {
 </script>
 
 <template>
-  <div class="login-wrapper">
-    <div class="login-card shadow-lg">
+  <div class="login-fullscreen">
 
-      <div class="text-center mb-4">
-        <img src="/logo-cng.png" alt="Logo CNG" class="login-logo">
-        <h4 class="mt-3 company-name">Centro de Negocios Ganaderos</h4>
-        <p class="text-muted small">Acceso al Sistema de Gestión</p>
-      </div>
+    <div class="brand-side d-none d-md-flex">
+      <video autoplay muted loop playsinline class="bg-video">
+        <source src="/IMG_2327.MP4" type="video/mp4">
+      </video>
+      <div class="video-overlay"></div>
 
-      <form @submit.prevent="login">
-        <div class="mb-3">
-          <label class="form-label">Correo Electrónico</label>
-          <div class="input-group">
-            <span class="input-group-text bg-white">✉️</span>
-            <input v-model="email" type="email" required class="form-control" placeholder="usuario@cng.com">
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label">Contraseña</label>
-          <div class="input-group">
-            <span class="input-group-text bg-white">🔒</span>
-            <input v-model="password" type="password" required class="form-control" placeholder="••••••••">
-          </div>
-        </div>
-
-        <div v-if="errorMsg" class="alert alert-danger py-2 small text-center mb-3">
-          {{ errorMsg }}
-        </div>
-
-        <button type="submit" :disabled="cargando" class="btn btn-primary-custom w-100 py-2">
-          {{ cargando ? 'Verificando...' : 'Iniciar Sesión' }}
-        </button>
-      </form>
-
-      <div class="text-center mt-4 border-top pt-3">
-        <small class="text-muted footer-text">CNG &copy; 2026 - v1.0</small>
+      <div class="brand-content">
+        <img src="/logo-cng.png" alt="Logo CNG" class="logo-hero">
+        <h1 class="display-4 fw-bold text-white mt-3">Centro de Negocios Ganaderos</h1>
+        <p class="lead text-white opacity-75">Plataforma de Gestión y Monitoreo</p>
       </div>
     </div>
+
+    <div class="auth-side">
+      <div class="form-container">
+
+        <div class="text-center d-md-none mb-4">
+          <img src="/logo-cng.png" alt="Logo" style="height: 80px;">
+        </div>
+
+        <h2 class="fw-bold text-dark-green mb-1">¡Bienvenido!</h2>
+        <p class="text-muted mb-4">Ingresa tus credenciales para acceder al sistema.</p>
+
+        <form @submit.prevent="login">
+          <div class="mb-3">
+            <label class="form-label fw-bold small text-secondary">Correo Electrónico</label>
+            <div class="input-group shadow-sm">
+              <span class="input-group-text bg-light border-end-0">✉️</span>
+              <input v-model="email" type="email" required class="form-control border-start-0 ps-0" placeholder="usuario@cng.com">
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-bold small text-secondary">Contraseña</label>
+            <div class="input-group shadow-sm">
+              <span class="input-group-text bg-light border-end-0">🔒</span>
+              <input v-model="password" type="password" required class="form-control border-start-0 ps-0" placeholder="••••••••">
+            </div>
+          </div>
+
+          <div v-if="errorMsg" class="alert alert-danger py-2 small text-center mb-3">
+            {{ errorMsg }}
+          </div>
+
+          <button type="submit" :disabled="cargando" class="btn btn-primary-custom w-100 py-3 fw-bold">
+            {{ cargando ? 'Verificando...' : 'INICIAR SESIÓN' }}
+          </button>
+        </form>
+
+        <div class="text-center mt-5 pt-3 border-top">
+          <small class="text-muted">© 2026 Centro de Negocios Ganaderos | v1.0</small>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <style scoped>
-/* --- ESTILO DE FONDO Y CONTENEDOR --- */
-.login-wrapper {
-  min-height: 100vh;
+.login-fullscreen {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* --- SECCIÓN IZQUIERDA --- */
+.brand-side {
+  flex: 2.8; /* Video con mayor protagonismo */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Fondo Verde Bosque Suave */
-  background-color: #E8F5E9;
-  background-image: radial-gradient(#1B5E20 0.5px, transparent 0.5px);
-  background-size: 20px 20px;
+  background-color: #1B5E20;
+  /* Bloqueo de selección de texto y cursor */
+  user-select: none;
+  cursor: default;
 }
 
-/* --- TARJETA CENTRAL --- */
-.login-card {
-  background: white;
-  padding: 2.5rem;
-  border-radius: 12px;
+.bg-video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, rgba(27, 94, 32, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%);
+  z-index: 1;
+}
+
+.brand-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 2rem;
+}
+
+.logo-hero {
+  width: 375px; /* 50% más grande que el original (250px) */
+  height: auto;
+  filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
+  pointer-events: none; /* Evita que el logo sea arrastrable */
+}
+
+/* --- SECCIÓN DERECHA (BLANCO SÓLIDO) --- */
+.auth-side {
+  flex: 1;
+  background-color: #ffffff; /* Sólido como pidió el cliente */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  z-index: 10;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+}
+
+.form-container {
   width: 100%;
-  max-width: 420px;
-  border-top: 6px solid #1B5E20; /* Borde superior verde corporativo */
+  max-width: 380px;
 }
 
-.login-logo {
-  height: 90px;
-  width: auto;
-  margin-bottom: 10px;
-}
+/* --- UI ELEMENTS --- */
+.text-dark-green { color: #1B5E20; }
 
-.company-name {
+.input-group-text {
   color: #1B5E20;
-  font-weight: 700;
-  font-size: 1.2rem;
-}
-
-/* --- FORMULARIO --- */
-.form-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #455A64;
+  border-color: #e0e0e0;
 }
 
 .form-control {
-  border-left: none;
-  padding: 0.6rem;
-}
-
-.input-group-text {
-  border-right: none;
-  color: #1B5E20;
+  border-color: #e0e0e0;
+  padding: 0.75rem;
 }
 
 .form-control:focus {
   border-color: #1B5E20;
   box-shadow: none;
 }
-.input-group:focus-within {
-  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.1);
-  border-radius: 4px;
-}
 
-/* --- BOTÓN --- */
 .btn-primary-custom {
-  background-color: #F9A825; /* Ámbar */
+  background-color: #F9A825;
   color: #212121;
   border: none;
-  font-weight: 700;
-  transition: all 0.3s;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
-.btn-primary-custom:hover {
+.btn-primary-custom:hover:not(:disabled) {
   background-color: #FBC02D;
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-.btn-primary-custom:disabled {
-  background-color: #ffe082;
-  transform: none;
-}
-.user-panel {
-  background-color: #f8f9fa;
-  padding: 0.5rem 1rem;
-  border-radius: 50px;
-  border: 1px solid #e0e0e0;
+  box-shadow: 0 5px 15px rgba(249, 168, 37, 0.4);
 }
 
-.user-avatar {
-  width: 40px;
-  height: 40px;
-  background-color: #1B5E20; /* Verde Corporativo */
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-.footer-text {
-  font-size: 0.75rem;
+@media (max-width: 768px) {
+  .brand-side { display: none; }
+  .auth-side { flex: 1; padding: 2rem; }
 }
 </style>
