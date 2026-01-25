@@ -3,6 +3,11 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
+// --- 1. DEFINIMOS LA URL AUTOMÁTICA ---
+const API_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api'                 // Si es local
+  : 'https://cng-backend.azurewebsites.net/api'; // Si es Azure
+
 const router = useRouter()
 const email = ref('')
 const password = ref('')
@@ -14,8 +19,8 @@ const login = async () => {
   errorMsg.value = ''
 
   try {
-    // Conectamos con tu nuevo Controller de Auth
-    const response = await axios.post('http://localhost:7292/api/Login', {
+    // --- 2. USAMOS LA VARIABLE AQUÍ ---
+    const response = await axios.post(`${API_URL}/Login`, {
       email: email.value,
       password: password.value
     })
