@@ -12,7 +12,7 @@ const API_URL = window.location.hostname.includes('localhost')
   : 'https://cng-backend.azurewebsites.net/api';
 
 const FINCAS_URL = `${BASE_URL}/Fincas`;
-
+const GUID_VACIO = '00000000-0000-0000-0000-000000000000';
 const router = useRouter()
 const usuarioLogueado = ref({ nombre: 'Usuario' })
 const fincas = ref([])
@@ -32,7 +32,7 @@ const formatearFecha = (fecha) => {
 };
 // Listas de Opciones
 const listaFases = ['Diagnostico', 'Implementacion', 'Seguimiento', 'Retiro']
-const categoriasGanado = ['Vaca parida','Vaca preñada','Vaca Vacia', 'Novilla', 'Ternero', 'Toro', 'Macho de ceba', 'Búfalo']
+const categoriasGanado = ['Vaca parida','macho levante','macho levante', 'Novilla de levante','Novilla','Novilla de vientre', 'Ternero', 'Toro', 'Macho de ceba','Búfalo']
 
 const formFinca = ref({
   id: null,
@@ -107,7 +107,14 @@ const cerrarSesion = () => {
 const guardarFinca = async () => {
   try {
     subiendoArchivos.value = true;
-
+    if (!formFinca.value.documentos) formFinca.value.documentos = [];
+    if (!formFinca.value.inventario) formFinca.value.inventario = [];
+    if (!formFinca.value.documentos) {
+      formFinca.value.documentos = [];
+    }
+    if (!formFinca.value.id) {
+        formFinca.value.id = GUID_VACIO;
+    }
     // 1. Subir archivos a la raíz de la API (No a /Fincas)
     if (archivosPendientes.value.length > 0) {
       for (const item of archivosPendientes.value) {
@@ -125,9 +132,11 @@ const guardarFinca = async () => {
     }
 
     // 2. Guardar Finca (Usamos FINCAS_URL)
-    if (formFinca.value.id) {
+    if (formFinca.value.id && formFinca.value.id !== GUID_VACIO) {
+      // Es Edición
       await axios.put(FINCAS_URL, formFinca.value);
     } else {
+      // Es Creación (El ID va como 00000000...)
       await axios.post(FINCAS_URL, formFinca.value);
     }
 
@@ -174,6 +183,7 @@ const editarFinca = async (fincaSeleccionada) => {
         formFinca.value = respuesta.data
         // Aseguramos que si el inventario viene nulo, sea un array vacío
         if (!formFinca.value.inventario) formFinca.value.inventario = []
+        if (!formFinca.value.documentos) formFinca.value.documentos = []
     }
   } catch (error) {
     console.error("Error cargando detalles", error)
@@ -203,7 +213,8 @@ const abrirModalCrear = () => {
     pilarSocioEconomico: 0,
     pilarAmbiental: 0,
     pilarParticipacion: 0,
-    inventario: []
+    inventario: [],
+    documentos: [],
   }
   // Resetear temp
   inventarioTemp.value = { categoria: 'Vaca parida', cantidad: 0 }
