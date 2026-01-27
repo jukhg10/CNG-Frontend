@@ -31,13 +31,94 @@ const formatearFecha = (fecha) => {
   return d.toLocaleDateString('es-CO');
 };
 // Listas de Opciones
+const tiposFinca = ['Censo', 'Asesoría Virtual', 'Mixta'];
 const listaFases = ['Diagnostico', 'Implementacion', 'Seguimiento', 'Retiro']
-const categoriasGanado = ['Vaca parida','macho levante','macho levante', 'Novilla de levante','Novilla','Novilla de vientre', 'Ternero', 'Toro', 'Macho de ceba','Búfalo']
+const catalogoEspecies = {
+  'Vacuno': [
+    'Vaca parida', 'Vaca horra', 'Vaca preñada', 'Vaca vacía',
+    'Novilla de vientre', 'Novilla de levante', 'Ternero', 'Toro', 'Macho de ceba'
+  ],
+  'Bufalino': [
+    'Búfala parida', 'Búfala horra', 'Búfala preñada',
+    'Bucerro', 'Búfalo Reproductor', 'Búfalo de ceba'
+  ],
+  'Otros': [
+    'Equino (Caballo/Yegua)', 'Mular', 'Asnal', 'Ovino', 'Caprino', 'Porcino'
+  ]
+};
 
+// 2. Estado para el primer selector
+const especieSeleccionada = ref('Vacuno');
+
+// 3. Computed para llenar el segundo selector automáticamente
+const listaCategoriasDisponibles = computed(() => {
+  return catalogoEspecies[especieSeleccionada.value] || [];
+});
+
+// 4. Función para resetear la categoría cuando cambia la especie
+const alCambiarEspecie = () => {
+  // Selecciona automáticamente la primera opción de la nueva lista
+  inventarioTemp.value.categoria = listaCategoriasDisponibles.value[0];
+};
+const agregarComentario = async () => {
+  // 1. Validar texto
+  if (!nuevoComentario.value.trim()) return;
+
+  // 2. Validar que la finca EXISTA (tenga ID real)
+  if (!formFinca.value.id || formFinca.value.id === GUID_VACIO) {
+    alert("⚠️ Debes guardar la finca por primera vez antes de agregar comentarios.");
+    return;
+  }
+
+  try {
+    // 3. Llamada directa al Backend
+    // POST /api/Fincas/{GUID}/Comentarios
+    const url = `${BASE_URL}/Fincas/${formFinca.value.id}/Comentarios`;
+
+    // Enviamos solo el texto, el backend pone la fecha
+    const respuesta = await axios.post(url, {
+        texto: nuevoComentario.value
+    });
+
+    // 4. Actualizar la vista al instante (sin recargar)
+    // Usamos el ID que nos devolvió el backend para poder borrarlo después si queremos
+    formFinca.value.comentarios.unshift({
+      id: respuesta.data.id,
+      texto: nuevoComentario.value,
+      fecha: respuesta.data.fecha || new Date().toISOString()
+    });
+
+    nuevoComentario.value = ''; // Limpiar input
+
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar el comentario. Revisa la consola.");
+  }
+};
+
+const eliminarComentario = async (index, comentarioId) => {
+  // 1. Confirmación
+  if (!confirm("¿Estás seguro de eliminar este comentario permanentemente?")) return;
+
+  try {
+    // 2. Llamada directa al Backend
+    // DELETE /api/Comentarios/{ID}
+    await axios.delete(`${BASE_URL}/Comentarios/${comentarioId}`);
+
+    // 3. Quitar de la lista visual
+    formFinca.value.comentarios.splice(index, 1);
+
+  } catch (error) {
+    console.error(error);
+    alert("Error al eliminar. Intenta recargar la página.");
+  }
+};
 const formFinca = ref({
   id: null,
   nombre: '',
-  tipoFinca: 'Administrar',
+  nombreProductor: '',
+  emailProductor: '',
+  tipoFinca: 'Censo',
   departamento: '',
   municipio: '',
   vereda: '',
@@ -52,13 +133,21 @@ const formFinca = ref({
   pilarSocioEconomico: 0,
   pilarAmbiental: 0,
   pilarParticipacion: 0,
-
-  inventario: []
+  inventario: [],
+  comentarios: []
 })
+const nuevoComentario = ref('');
 
+// --- 4. Función auxiliar para mostrar hora bonita ---
+const formatoHora = (fechaIso) => {
+  if (!fechaIso) return '';
+  const d = new Date(fechaIso);
+  // Devuelve ej: "27/1/2026 10:30 AM"
+  return d.toLocaleString('es-CO', { hour12: true });
+};
 // Estado temporal para agregar una fila de inventario
 const inventarioTemp = ref({
-  categoria: 'Vaca parida',
+  categoria: 'Vaca parida', // Valor por defecto
   cantidad: 0
 });
 
@@ -204,7 +293,9 @@ const abrirModalCrear = () => {
   formFinca.value = {
     id: null,
     nombre: '',
-    tipoFinca: 'Administrar',
+    nombreProductor: '',
+    emailProductor: '',
+    tipoFinca: 'Censo',
     faseAvance: 'Diagnostico',
     tipoProduccion: '',
     asistioEvento: false,
@@ -213,9 +304,11 @@ const abrirModalCrear = () => {
     pilarSocioEconomico: 0,
     pilarAmbiental: 0,
     pilarParticipacion: 0,
+    comentarios: [],
     inventario: [],
     documentos: [],
   }
+
   // Resetear temp
   inventarioTemp.value = { categoria: 'Vaca parida', cantidad: 0 }
 
@@ -300,33 +393,38 @@ onMounted(() => {
     </div>
 
     <div class="control-panel shadow-sm">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label custom-label">Buscar Predio</label>
-          <div class="input-group">
-            <span class="input-group-text bg-white border-end-0">🔍</span>
-            <input v-model="filtroNombre" type="text" class="form-control border-start-0 ps-0" placeholder="Nombre de la finca...">
-          </div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label custom-label">Filtro por Fase</label>
-          <select v-model="filtroFase" class="form-select">
-            <option value="">Todas las fases</option>
-            <option v-for="fase in listaFases" :key="fase" :value="fase">{{ fase }}</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <button @click="cargarFincas" class="btn btn-outline-custom w-100">
-             Actualizar
-          </button>
-        </div>
-        <div class="col-md-3 text-end">
-          <button @click="abrirModalCrear" class="btn btn-primary-custom w-100">
-             + Nueva Finca
-          </button>
-        </div>
+  <div class="row g-3 align-items-end">
+
+    <div class="col-12 col-md-4">
+      <label class="form-label custom-label">Buscar Predio</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0">🔍</span>
+        <input v-model="filtroNombre" type="text" class="form-control border-start-0 ps-0" placeholder="Nombre de la finca...">
       </div>
     </div>
+
+    <div class="col-12 col-md-3">
+      <label class="form-label custom-label">Filtro por Fase</label>
+      <select v-model="filtroFase" class="form-select">
+        <option value="">Todas las fases</option>
+        <option v-for="fase in listaFases" :key="fase" :value="fase">{{ fase }}</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-md-2">
+      <button @click="cargarFincas" class="btn btn-outline-custom w-100">
+          Actualizar
+      </button>
+    </div>
+
+    <div class="col-6 col-md-3 text-end">
+      <button @click="abrirModalCrear" class="btn btn-primary-custom w-100">
+          + Nueva Finca
+      </button>
+    </div>
+
+  </div>
+</div>
 
     <div class="table-container shadow-sm">
       <table class="table custom-table">
@@ -336,7 +434,7 @@ onMounted(() => {
             <th>Tipo</th>
             <th>Ubicación</th>
             <th>Estado Actual</th>
-            <th>Producción</th>
+            <th style="width: 120px;">Última Act.</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -348,24 +446,36 @@ onMounted(() => {
             <td colspan="6" class="text-center py-4 text-muted">No se encontraron registros.</td>
           </tr>
           <tr v-for="finca in fincasFiltradas" :key="finca.id">
-            <td class="fw-bold text-dark-green">{{ finca.nombre }}</td>
-            <td>
-              <span class="badge-custom" :class="finca.tipoFinca === 'Administrar' ? 'badge-admin' : 'badge-censo'">
+
+            <td data-label="Nombre del Predio" class="fw-bold text-dark-green">
+              {{ finca.nombre }}
+            </td>
+
+            <td data-label="Tipo">
+              <span class="badge-custom" :class="finca.tipoFinca === 'Censo' ? 'badge-censo' : 'badge-admin'">
                 {{ finca.tipoFinca }}
               </span>
             </td>
-            <td class="text-muted">{{ finca.municipio }}</td>
-            <td>
+
+            <td data-label="Ubicación" class="text-muted">
+              {{ finca.municipio }}
+            </td>
+
+            <td data-label="Estado Actual">
               <span class="status-indicator">
                 <span class="dot" :class="finca.faseAvance.toLowerCase()"></span> {{ finca.faseAvance }}
               </span>
             </td>
-            <td>{{ finca.tipoProduccion }}</td>
-            <td class="text-end">
-              <button @click="editarFinca(finca)" class="btn-icon" title="Editar">✏️</button>
 
+            <td data-label="Última Act." class="text-muted small">
+                📅 {{ formatearFecha(finca.fechaActualizacion) }}
+            </td>
+
+            <td class="text-end actions-cell">
+              <button @click="editarFinca(finca)" class="btn-icon" title="Editar">✏️</button>
               <button @click="eliminarFinca(finca.id)" class="btn-icon delete" title="Eliminar">🗑️</button>
             </td>
+
           </tr>
         </tbody>
       </table>
@@ -389,10 +499,38 @@ onMounted(() => {
                 <input v-model="formFinca.nombre" required type="text" class="form-control">
               </div>
               <div class="col-md-6">
+    <label class="form-label">Nombre del Productor *</label>
+    <div class="input-group">
+        <span class="input-group-text bg-light text-muted">👤</span>
+        <input
+            v-model="formFinca.nombreProductor"
+            required
+            type="text"
+            class="form-control"
+            placeholder="Nombre completo"
+        >
+    </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">Correo Electrónico</label>
+        <div class="input-group">
+            <span class="input-group-text bg-light text-muted">@</span>
+            <input
+                v-model="formFinca.emailProductor"
+                type="email"
+                class="form-control"
+                placeholder="ejemplo@correo.com"
+            >
+        </div>
+    </div>
+              <div class="col-md-6">
                 <label class="form-label">Propósito</label>
                 <select v-model="formFinca.tipoFinca" class="form-select">
-                  <option value="Administrar">Administrar</option>
-                  <option value="Censo">Censo</option>
+                  <option disabled value="">Seleccione una opción...</option>
+                  <option v-for="tipo in tiposFinca" :key="tipo" :value="tipo">
+                    {{ tipo }}
+                  </option>
                 </select>
               </div>
 
@@ -485,23 +623,34 @@ onMounted(() => {
   </div>
 
   <div class="row g-2 align-items-end">
-    <div class="col-md-5">
-      <label class="form-label small text-muted">Categoría</label>
-      <select v-model="inventarioTemp.categoria" class="form-select form-select-sm">
-        <option v-for="cat in categoriasGanado" :key="cat" :value="cat">{{ cat }}</option>
-      </select>
-    </div>
-
     <div class="col-md-3">
-      <label class="form-label small text-muted">Cantidad</label>
-      <input v-model.number="inventarioTemp.cantidad" type="number" min="0" class="form-control form-control-sm">
-    </div>
+    <label class="form-label small fw-bold text-dark-green">1. Especie</label>
+    <select v-model="especieSeleccionada" @change="alCambiarEspecie" class="form-select form-select-sm">
+      <option value="Vacuno">Vacuno 🐮</option>
+      <option value="Bufalino">Bufalino 🐃</option>
+      <option value="Otros">Otros 🐴</option>
+    </select>
+  </div>
 
     <div class="col-md-4">
-      <button type="button" @click="agregarAnimal" class="btn btn-sm btn-success w-100">
-        + Añadir a la lista
-      </button>
-    </div>
+    <label class="form-label small fw-bold text-dark-green">2. Categoría</label>
+    <select v-model="inventarioTemp.categoria" class="form-select form-select-sm">
+      <option v-for="cat in listaCategoriasDisponibles" :key="cat" :value="cat">
+        {{ cat }}
+      </option>
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label small fw-bold text-dark-green">Cant.</label>
+    <input v-model.number="inventarioTemp.cantidad" type="number" class="form-control form-control-sm" placeholder="0">
+  </div>
+
+    <div class="col-md-3">
+    <button type="button" @click="agregarAnimal" class="btn btn-sm btn-success w-100 fw-bold">
+      + Agregar
+    </button>
+  </div>
   </div>
 
   <div v-if="formFinca.inventario.length > 0" class="mt-3 table-responsive bg-white border rounded shadow-sm">
@@ -526,6 +675,67 @@ onMounted(() => {
       </tbody>
     </table>
   </div>
+  <div class="col-12 section-title mt-4">Historial y Bitácora</div>
+
+<div class="col-12">
+    <div class="d-flex gap-2 mb-3">
+    <input
+        v-model="nuevoComentario"
+        @keyup.enter="agregarComentario"
+        type="text"
+        class="form-control"
+        placeholder="Escribe una nota o evento..."
+        :disabled="!formFinca.id || formFinca.id === GUID_VACIO"
+    >
+    <button
+        type="button"
+        @click="agregarComentario"
+        class="btn btn-primary-custom"
+        :disabled="!formFinca.id || formFinca.id === GUID_VACIO"
+    >
+        Enviar 💬
+    </button>
+</div>
+<small v-if="!formFinca.id || formFinca.id === GUID_VACIO" class="text-danger fw-bold">
+    * Guarda la finca primero para habilitar los comentarios.
+</small>
+
+    <div class="historial-container bg-light p-3 rounded border" style="max-height: 250px; overflow-y: auto;">
+
+        <div v-if="formFinca.comentarios.length === 0" class="text-center text-muted small py-3">
+            No hay comentarios registrados.
+        </div>
+
+        <div v-else v-for="(com, index) in formFinca.comentarios" :key="index" class="mb-2">
+    <div class="bg-white p-2 rounded border-start border-4 border-success shadow-sm">
+
+        <div class="d-flex justify-content-between align-items-start mb-1">
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-success bg-opacity-10 text-success rounded-pill small">
+                    👤 Usuario
+                </span>
+                <small class="text-muted" style="font-size: 0.75rem;">
+                    🕒 {{ formatoHora(com.fecha) }}
+                </small>
+            </div>
+
+            <button
+    type="button"
+    @click="eliminarComentario(index, com.id)"
+    class="btn btn-link text-danger p-0 border-0"
+    title="Eliminar permanentemente"
+>
+    🗑️ </button>
+
+        </div>
+
+        <div class="text-dark small ps-1" style="white-space: pre-wrap;">{{ com.texto }}</div>
+    </div>
+</div>
+
+    </div>
+</div>
 </div>
             <div class="col-12 section-title mt-4">Documentación y Mapas</div>
 
@@ -786,5 +996,82 @@ onMounted(() => {
 .custom-checkbox input:checked ~ .checkmark:after { display: block; }
 .custom-checkbox .checkmark:after {
   left: 7px; top: 3px; width: 5px; height: 10px; border: solid white; border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+@media screen and (max-width: 768px) {
+
+  /* 1. Ocultar los encabezados de la tabla (no caben) */
+  .custom-table thead {
+    display: none;
+  }
+
+  /* 2. Convertir la tabla y filas en bloques apilados */
+  .custom-table, .custom-table tbody, .custom-table tr, .custom-table td {
+    display: block;
+    width: 100%;
+  }
+
+  /* 3. Estilo de "Tarjeta" para cada fila */
+  .custom-table tr {
+    margin-bottom: 1.5rem;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  /* 4. Estilo de las celdas internas */
+  .custom-table td {
+    text-align: right; /* El dato va a la derecha */
+    padding: 12px 16px;
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+    min-height: 45px;
+    display: flex;
+    justify-content: space-between; /* Separa etiqueta y valor */
+    align-items: center;
+  }
+
+  /* 5. Insertar el "Título" de la columna a la izquierda */
+  .custom-table td::before {
+    content: attr(data-label); /* 👈 Lee el atributo HTML que pusimos arriba */
+    font-weight: 700;
+    color: #1B5E20;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-right: auto; /* Empuja el valor a la derecha */
+  }
+
+  /* 6. Ajuste especial para el Nombre (Encabezado de la tarjeta) */
+  .custom-table td:first-child {
+    background-color: #1B5E20;
+    color: white !important;
+    justify-content: center; /* Centrado */
+    padding: 10px;
+  }
+  .custom-table td:first-child::before {
+    display: none; /* No mostrar etiqueta "Nombre" */
+  }
+
+  /* 7. Ajuste para Acciones (Botones al final) */
+  .custom-table td:last-child {
+    border-bottom: 0;
+    justify-content: center;
+    background-color: #f9f9f9;
+    padding: 15px;
+  }
+  .custom-table td:last-child::before {
+    display: none;
+  }
+
+  /* Botones más grandes para dedos */
+  .btn-icon {
+    font-size: 1.5rem;
+    padding: 10px 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 0 10px;
+  }
 }
 </style>
