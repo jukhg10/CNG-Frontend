@@ -152,7 +152,8 @@ onMounted(() => {
             </td>
             <td class="text-end">
               <button @click="abrirModal(u)" class="btn-icon">✏️</button>
-              <button @click="eliminarUsuario(u.id)" class="btn-icon delete">🗑️</button>
+              <button @click="eliminarUsuario(u.id)" class="btn-icon
+              ">🗑️</button>
             </td>
           </tr>
         </tbody>

@@ -3,6 +3,7 @@ import UserLogin from '../components/UserLogin.vue'
 import AdminFincas from '../components/AdminFincas.vue'
 import AdminUsuarios from '../components/AdminUsuarios.vue'
 import UserHome from '../components/UserHome.vue' // <--- IMPORTAR
+import PlanOperativo from '../components/PlanOperativo.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,6 +25,12 @@ const router = createRouter({
       name: 'usuarios',
       component: AdminUsuarios,
       // 🔒 CANDADO: Requiere Login Y ser Admin
+      meta: { requiresAuth: true, requireAdmin: true }
+    },
+   {
+      path: '/admin/plan-operativo/:id?',
+      name: 'plan-operativo-admin',
+      component: PlanOperativo,
       meta: { requiresAuth: true, requireAdmin: true }
     },
     {

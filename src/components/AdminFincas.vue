@@ -386,7 +386,13 @@ onMounted(() => {
           class="btn btn-sm btn-outline-primary">
           👥 Usuarios
         </button>
-        <button @click="cerrarSesion" class="btn btn-outline-danger btn-sm" title="Cerrar Sesión">
+        <button
+          @click="$router.push('/admin/plan-operativo')"
+          class="btn btn-warning fw-bold shadow-sm"
+        >
+          📊 Gestionar Planes Operativos
+        </button>
+                <button @click="cerrarSesion" class="btn btn-outline-danger btn-sm" title="Cerrar Sesión">
           Salir 🚪
         </button>
       </div>
