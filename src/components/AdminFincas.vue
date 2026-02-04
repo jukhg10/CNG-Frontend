@@ -64,27 +64,29 @@ const agregarComentario = async () => {
   // 1. Validar texto
   if (!nuevoComentario.value.trim()) return;
 
-  // 2. Validar que la finca EXISTA (tenga ID real)
+  // 2. Validar que la finca EXISTA
   if (!formFinca.value.id || formFinca.value.id === GUID_VACIO) {
     alert("⚠️ Debes guardar la finca por primera vez antes de agregar comentarios.");
     return;
   }
 
   try {
-    // 3. Llamada directa al Backend
-    // POST /api/Fincas/{GUID}/Comentarios
     const url = `${BASE_URL}/Fincas/${formFinca.value.id}/Comentarios`;
 
-    // Enviamos solo el texto, el backend pone la fecha
-    const respuesta = await axios.post(url, {
-        texto: nuevoComentario.value
-    });
+    // 👇 AQUÍ ESTÁ EL CAMBIO IMPORTANTE:
+    // Agregamos 'autor' al envío para que el Backend no de error 500
+    const payload = {
+        texto: nuevoComentario.value,
+        autor: 'Administración CNG' // O usa usuarioLogueado.value.nombre si prefieres
+    };
 
-    // 4. Actualizar la vista al instante (sin recargar)
-    // Usamos el ID que nos devolvió el backend para poder borrarlo después si queremos
+    const respuesta = await axios.post(url, payload);
+
+    // 4. Actualizar la vista
     formFinca.value.comentarios.unshift({
       id: respuesta.data.id,
       texto: nuevoComentario.value,
+      autor: payload.autor, // Visualmente mostramos el mismo autor
       fecha: respuesta.data.fecha || new Date().toISOString()
     });
 
@@ -92,7 +94,7 @@ const agregarComentario = async () => {
 
   } catch (error) {
     console.error(error);
-    alert("Error al enviar el comentario. Revisa la consola.");
+    alert("Error al enviar el comentario. Revisa que el Backend esté corriendo.");
   }
 };
 
@@ -116,7 +118,11 @@ const eliminarComentario = async (index, comentarioId) => {
 const formFinca = ref({
   id: null,
   nombre: '',
+  afiliacion: '',
+  areaTotal: 0,
+  areaBosques: 0,
   nombreProductor: '',
+  usuarioId: null,
   emailProductor: '',
   tipoFinca: 'Censo',
   departamento: '',
@@ -176,12 +182,24 @@ const quitarPendiente = (id) => {
     archivosPendientes.value = archivosPendientes.value.filter(arch => arch.id !== id);
 };
 // --- 3. FUNCIONES DE LÓGICA ---
+const listaAfiliaciones = ref([
+
+]);
+
+const afiliacionPersonalizada = ref('');
 
 const cargarFincas = async () => {
   cargando.value = true
   try {
     const respuesta = await axios.get(API_URL)
     fincas.value = respuesta.data
+
+    fincas.value.forEach(f => {
+      if (f.afiliacion && !listaAfiliaciones.value.includes(f.afiliacion)) {
+        listaAfiliaciones.value.push(f.afiliacion);
+      }
+    });
+
   } catch (error) {
     alert('Error: ' + error.message)
   } finally {
@@ -195,6 +213,20 @@ const cerrarSesion = () => {
 // 2. Guardar (Crear o Editar)
 const guardarFinca = async () => {
   try {
+    if (formFinca.value.afiliacion === 'OTRO') {
+       if (!afiliacionPersonalizada.value.trim()) {
+         alert("Por favor escribe el nombre de la nueva afiliación.");
+         return;
+       }
+
+       const nuevaAfiliacion = afiliacionPersonalizada.value.trim();
+
+       formFinca.value.afiliacion = nuevaAfiliacion;
+
+       if (!listaAfiliaciones.value.includes(nuevaAfiliacion)) {
+         listaAfiliaciones.value.push(nuevaAfiliacion);
+       }
+    }
     subiendoArchivos.value = true;
     if (!formFinca.value.documentos) formFinca.value.documentos = [];
     if (!formFinca.value.inventario) formFinca.value.inventario = [];
@@ -310,6 +342,7 @@ const abrirModalCrear = () => {
   }
 
   // Resetear temp
+  afiliacionPersonalizada.value = '';
   inventarioTemp.value = { categoria: 'Vaca parida', cantidad: 0 }
 
   mostrarModal.value = true
@@ -346,7 +379,18 @@ const fincasFiltradas = computed(() => {
     return coincideNombre && coincideFase
   })
 })
+const listaUsuarios = ref([]);
 
+// Nueva función
+const cargarUsuarios = async () => {
+  try {
+
+    const res = await axios.get(`${BASE_URL}/Users`);
+    listaUsuarios.value = res.data;
+  } catch (error) {
+    console.error("Error cargando usuarios:", error);
+  }
+};
 // Cargar al iniciar
 onMounted(() => {
   // Recuperar datos del usuario guardado
@@ -355,7 +399,8 @@ onMounted(() => {
     usuarioLogueado.value = JSON.parse(datosUsuario)
   }
 
-  cargarFincas()
+  cargarFincas();
+  cargarUsuarios();
 })
 </script>
 
@@ -504,6 +549,18 @@ onMounted(() => {
                 <label class="form-label">Nombre de la Finca *</label>
                 <input v-model="formFinca.nombre" required type="text" class="form-control">
               </div>
+              <div class="col-12 bg-primary bg-opacity-10 p-3 rounded mb-3 border border-primary">
+  <label class="form-label fw-bold text-primary">👤 Vincular Cuenta de Usuario</label>
+  <select v-model="formFinca.usuarioId" class="form-select border-primary fw-bold">
+    <option :value="null">-- Sin cuenta vinculada (Solo texto) --</option>
+    <option v-for="user in listaUsuarios" :key="user.id" :value="user.id">
+      {{ user.nombre }} ({{ user.email }})
+    </option>
+  </select>
+  <small class="text-muted d-block mt-1">
+    Si seleccionas un usuario, él podrá ver esta finca al iniciar sesión.
+  </small>
+</div>
               <div class="col-md-6">
     <label class="form-label">Nombre del Productor *</label>
     <div class="input-group">
@@ -591,6 +648,40 @@ onMounted(() => {
                 <label class="form-label">Sistema Productivo</label>
                 <input v-model="formFinca.tipoProduccion" type="text" class="form-control" placeholder="Ej: Leche, Cría">
               </div>
+              <div class="col-md-6">
+                <label class="form-label">Afiliación / Grupo</label>
+                <select v-model="formFinca.afiliacion" class="form-select">
+                  <option value="" disabled>Seleccione...</option>
+                  <option v-for="af in listaAfiliaciones" :key="af" :value="af">{{ af }}</option>
+                  <option value="OTRO" class="fw-bold text-primary">➕ Crear nueva afiliación...</option>
+                </select>
+
+                <div v-if="formFinca.afiliacion === 'OTRO'" class="mt-2 animate__animated animate__fadeIn">
+                  <input
+                    v-model="afiliacionPersonalizada"
+                    type="text"
+                    class="form-control border-primary bg-primary bg-opacity-10 fw-bold"
+                    placeholder="Escribe el nombre del nuevo grupo..."
+                    autofocus
+                  >
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Área Total (Hectáreas)</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light">Ha</span>
+                  <input v-model.number="formFinca.areaTotal" type="number" step="0.01" class="form-control" placeholder="0.00">
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Área en Bosques</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light">🌳</span>
+                  <input v-model.number="formFinca.areaBosques" type="number" step="0.01" class="form-control" placeholder="0.00">
+                </div>
+              </div>
               <div class="col-md-4 pt-4">
                 <label class="custom-checkbox">
                   <input v-model="formFinca.asistioEvento" type="checkbox">
@@ -613,7 +704,7 @@ onMounted(() => {
                 <input v-model.number="formFinca.pilarAmbiental" type="number" step="0.1" class="form-control">
               </div>
               <div class="col-md-3">
-                <label class="form-label text-muted small">Participación</label>
+                <label class="form-label text-muted small">Marketing</label>
                 <input v-model.number="formFinca.pilarParticipacion" type="number" step="0.1" class="form-control">
               </div>
 
@@ -719,7 +810,7 @@ onMounted(() => {
 
             <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-success bg-opacity-10 text-success rounded-pill small">
-                    👤 Usuario
+                    👤 {{ com.autor || 'Desconocido' }}
                 </span>
                 <small class="text-muted" style="font-size: 0.75rem;">
                     🕒 {{ formatoHora(com.fecha) }}

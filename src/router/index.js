@@ -4,7 +4,7 @@ import AdminFincas from '../components/AdminFincas.vue'
 import AdminUsuarios from '../components/AdminUsuarios.vue'
 import UserHome from '../components/UserHome.vue' // <--- IMPORTAR
 import PlanOperativo from '../components/PlanOperativo.vue'
-
+import UserFinca from '../components/UserFinca.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -27,6 +27,7 @@ const router = createRouter({
       // 🔒 CANDADO: Requiere Login Y ser Admin
       meta: { requiresAuth: true, requireAdmin: true }
     },
+
    {
       path: '/admin/plan-operativo/:id?',
       name: 'plan-operativo-admin',
@@ -39,7 +40,13 @@ const router = createRouter({
       component: UserHome,
       // 🔓 ABIERTO: Solo requiere Login (cualquier rol sirve)
       meta: { requiresAuth: true }
-    }
+    },
+    {
+  path: '/fincas/:id/detalle', // Ruta para el usuario
+  name: 'user-finca',
+  component: UserFinca,
+  meta: { requiresAuth: true }
+}
   ]
 })
 
