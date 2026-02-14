@@ -25,12 +25,29 @@ const login = async () => {
     })
 
     if (response.data) {
-      localStorage.setItem('usuario', JSON.stringify(response.data))
-      if (response.data.rol === 'Admin') {
-        router.push('/admin')
-      } else {
-        router.push('/inicio')
-      }
+      const usuario = response.data;
+
+      // 👇 AQUÍ ESTÁ EL CAMBIO CLAVE PARA LA SEGURIDAD 👇
+      // Guardamos los datos por separado para que AdminFincas los pueda leer fácil
+      localStorage.setItem('usuario_id', usuario.id);
+      localStorage.setItem('usuario_rol', usuario.rol);
+      localStorage.setItem('usuario_nombre', usuario.nombre || usuario.email);
+
+      // Guardamos la organización (Si es null, guardamos cadena vacía)
+      localStorage.setItem('usuario_org', usuario.organizacion || '');
+
+      // (Opcional) Dejamos el objeto completo por si acaso lo usas en otro lado
+      localStorage.setItem('usuario', JSON.stringify(usuario));
+
+      // Redirección según rol
+      if (usuario.rol === 'Admin') {
+  router.push('/admin'); // AdminFincas (Super Admin)
+} else if (usuario.rol === 'Organizacion') {
+  router.push('/admin-org'); // AdminOrganizacion (Nueva Vista)
+} else {
+  // Para usuarios normales (productores)
+  router.push('/inicio');
+}
     }
   } catch (error) {
     if (error.response && error.response.status === 401) {
@@ -96,7 +113,12 @@ const login = async () => {
             {{ cargando ? 'Verificando...' : 'INICIAR SESIÓN' }}
           </button>
         </form>
-
+          <div class="mt-4 pt-3 border-top text-center">
+              <p class="small text-muted mb-2">¿No tienes cuenta? Visualiza el avance del proyecto:</p>
+              <button @click="$router.push('/estadisticas')" class="btn btn-outline-success w-100 fw-bold">
+                  📊 Ver Estadísticas Públicas
+              </button>
+          </div>
         <div class="text-center mt-5 pt-3 border-top">
           <small class="text-muted">© 2026 Centro de Negocios Ganaderos | v1.0</small>
         </div>
@@ -117,13 +139,12 @@ const login = async () => {
 
 /* --- SECCIÓN IZQUIERDA --- */
 .brand-side {
-  flex: 2.8; /* Video con mayor protagonismo */
+  flex: 2.8;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #1B5E20;
-  /* Bloqueo de selección de texto y cursor */
   user-select: none;
   cursor: default;
 }
@@ -152,16 +173,16 @@ const login = async () => {
 }
 
 .logo-hero {
-  width: 375px; /* 50% más grande que el original (250px) */
+  width: 375px;
   height: auto;
   filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
-  pointer-events: none; /* Evita que el logo sea arrastrable */
+  pointer-events: none;
 }
 
-/* --- SECCIÓN DERECHA (BLANCO SÓLIDO) --- */
+/* --- SECCIÓN DERECHA --- */
 .auth-side {
   flex: 1;
-  background-color: #ffffff; /* Sólido como pidió el cliente */
+  background-color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;

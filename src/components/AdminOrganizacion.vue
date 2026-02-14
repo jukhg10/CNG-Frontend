@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-
 // --- 1. CONFIGURACIÓN Y ESTADO ---
 const API_URL = window.location.hostname.includes('localhost')
   ? 'http://localhost:7292/api/Fincas'
@@ -16,6 +15,7 @@ const FINCAS_URL = `${BASE_URL}/Fincas`;
 const GUID_VACIO = '00000000-0000-0000-0000-000000000000';
 const router = useRouter()
 const usuarioLogueado = ref({ nombre: 'Usuario' })
+const miOrganizacion = ref(localStorage.getItem('usuario_org') || '');
 const fincas = ref([])
 const cargando = ref(false)
 const mostrarModal = ref(false)
@@ -119,7 +119,7 @@ const eliminarComentario = async (index, comentarioId) => {
 const formFinca = ref({
   id: null,
   nombre: '',
-  afiliacion: '',
+  afiliacion: miOrganizacion.value,
   areaTotal: 0,
   areaBosques: 0,
   nombreProductor: '',
@@ -192,14 +192,17 @@ const afiliacionPersonalizada = ref('');
 const cargarFincas = async () => {
   cargando.value = true
   try {
-    const respuesta = await axios.get(API_URL)
-    fincas.value = respuesta.data
+    // 👇 ESTO ES LO NUEVO: Headers de seguridad
+    const config = {
+        headers: {
+            'X-Rol': localStorage.getItem('usuario_rol'),
+            'X-Org': localStorage.getItem('usuario_org')
+        }
+    };
 
-    fincas.value.forEach(f => {
-      if (f.afiliacion && !listaAfiliaciones.value.includes(f.afiliacion)) {
-        listaAfiliaciones.value.push(f.afiliacion);
-      }
-    });
+    // Enviamos la config en el GET
+    const respuesta = await axios.get(API_URL, config)
+    fincas.value = respuesta.data
 
   } catch (error) {
     alert('Error: ' + error.message)
@@ -228,6 +231,7 @@ const guardarFinca = async () => {
          listaAfiliaciones.value.push(nuevaAfiliacion);
        }
     }
+    formFinca.value.afiliacion = miOrganizacion.value;
     subiendoArchivos.value = true;
     if (!formFinca.value.documentos) formFinca.value.documentos = [];
     if (!formFinca.value.inventario) formFinca.value.inventario = [];
@@ -402,9 +406,18 @@ const listaUsuarios = ref([]);
 // Nueva función
 const cargarUsuarios = async () => {
   try {
+    const config = {
+        headers: {
+            'X-Rol': localStorage.getItem('usuario_rol'),
+            'X-Org': localStorage.getItem('usuario_org')
+        }
+    };
+    const res = await axios.get(`${BASE_URL}/Users`, config);
 
-    const res = await axios.get(`${BASE_URL}/Users`);
-    listaUsuarios.value = res.data;
+
+    if (res.data) {
+        listaUsuarios.value = res.data.filter(u => u.organizacion === miOrganizacion.value);
+    }
   } catch (error) {
     console.error("Error cargando usuarios:", error);
   }
@@ -443,12 +456,11 @@ onMounted(() => {
         <div class="user-avatar">
           {{ usuarioLogueado.nombre.charAt(0).toUpperCase() }}
         </div>
-        <button
-          v-if="usuarioLogueado.rol === 'Admin'"
-          @click="$router.push('/usuarios')"
-          class="btn btn-sm btn-outline-primary">
-          👥 Usuarios
-        </button>
+       <button
+        @click="$router.push('/usuarios-org')"
+        class="btn btn-outline-primary fw-bold shadow-sm">
+        👥 Gestionar Mis Usuarios
+    </button>
         <button
           @click="$router.push('/admin/plan-operativo')"
           class="btn btn-warning fw-bold shadow-sm"
@@ -667,22 +679,12 @@ onMounted(() => {
                 <input v-model="formFinca.tipoProduccion" type="text" class="form-control" placeholder="Ej: Leche, Cría">
               </div>
               <div class="col-md-6">
-                <label class="form-label">Afiliación / Grupo</label>
-                <select v-model="formFinca.afiliacion" class="form-select">
-                  <option value="" disabled>Seleccione...</option>
-                  <option v-for="af in listaAfiliaciones" :key="af" :value="af">{{ af }}</option>
-                  <option value="OTRO" class="fw-bold text-primary">➕ Crear nueva afiliación...</option>
-                </select>
-
-                <div v-if="formFinca.afiliacion === 'OTRO'" class="mt-2 animate__animated animate__fadeIn">
-                  <input
-                    v-model="afiliacionPersonalizada"
-                    type="text"
-                    class="form-control border-primary bg-primary bg-opacity-10 fw-bold"
-                    placeholder="Escribe el nombre del nuevo grupo..."
-                    autofocus
-                  >
-                </div>
+                    <label class="form-label text-success fw-bold">Organización (Fija)</label>
+                    <input
+                        v-model="formFinca.afiliacion"
+                        readonly
+                        class="form-control bg-success bg-opacity-10 fw-bold text-success border-success"
+                    >
               </div>
 
               <div class="col-md-4">

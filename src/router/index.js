@@ -2,9 +2,14 @@ import { createRouter, createWebHistory } from 'vue-router'
 import UserLogin from '../components/UserLogin.vue'
 import AdminFincas from '../components/AdminFincas.vue'
 import AdminUsuarios from '../components/AdminUsuarios.vue'
-import UserHome from '../components/UserHome.vue' // <--- IMPORTAR
+import UserHome from '../components/UserHome.vue'
 import PlanOperativo from '../components/PlanOperativo.vue'
 import UserFinca from '../components/UserFinca.vue'
+import CentroAyuda from '../components/CentroAyuda.vue'
+import AdminOrganizacion from '../components/AdminOrganizacion.vue'
+import UsuariosOrganizacion from '../components/UsuariosOrganizacion.vue'
+import PublicStats from '../components/PublicStats.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -12,6 +17,10 @@ const router = createRouter({
       path: '/',
       name: 'login',
       component: UserLogin
+    },
+    { path: '/estadisticas',
+       name: 'PublicStats',
+        component: PublicStats
     },
     {
       path: '/admin',
@@ -41,6 +50,21 @@ const router = createRouter({
       // 🔓 ABIERTO: Solo requiere Login (cualquier rol sirve)
       meta: { requiresAuth: true }
     },
+    {
+    path: '/admin-org',
+    name: 'AdminOrganizacion',
+    component: AdminOrganizacion
+  },
+    {
+    path: '/ayuda',
+    name: 'Ayuda',
+    component: CentroAyuda
+  },
+  {
+    path: '/usuarios-org',
+    name: 'UsuariosOrganizacion',
+    component: UsuariosOrganizacion
+  },
     {
   path: '/fincas/:id/detalle', // Ruta para el usuario
   name: 'user-finca',

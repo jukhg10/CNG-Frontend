@@ -1,10 +1,9 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-// Asegúrate de que esta URL coincida con tu Controlador de Usuarios
 const API_URL = window.location.hostname.includes('localhost')
   ? 'http://localhost:7292/api/Users'
   : 'https://cng-backend.azurewebsites.net/api/Users'
@@ -15,59 +14,39 @@ const cargando = ref(false)
 const mostrarModal = ref(false)
 const guardando = ref(false)
 
-// Datos del usuario que está conectado actualmente
-const soySuperAdmin = ref(false)
+// Datos del Admin de Organización
 const miOrganizacion = ref('')
 const miNombre = ref('')
 
-// Listas
-const listaOrganizaciones = ['Fedegan', 'Comité Ganaderos', 'Gobernación', 'Alcaldía', 'Independiente'];
-const organizacionManual = ref('');
-
-// Formulario
+// Formulario (Sin campo organización, ya que es implícito)
 const formUsuario = ref({
   id: 0,
   nombre: '',
   email: '',
   password: '',
-  rol: '',
-  organizacion: ''
+  rol: 'Usuario',
+  organizacion: '' // Se llena automático al guardar
 })
 
-// --- COMPUTADOS ---
-
-// Filtra los roles: Si no soy SuperAdmin, no puedo crear otros Admins
-const rolesDisponibles = computed(() => {
-  if (soySuperAdmin.value) {
-    return ['Admin', 'Organizacion', 'Veterinario', 'Auditor', 'Usuario']
-  } else {
-    // Semi-Admin solo crea personal operativo
-    return ['Veterinario', 'Auditor', 'Usuario']
-  }
-})
+// Roles permitidos para crear (NUNCA 'Admin')
+const rolesPermitidos = ['Veterinario', 'Auditor', 'Usuario']
 
 // --- FUNCIONES ---
 
 const cargarUsuarios = async () => {
   cargando.value = true
   try {
-    // Enviamos headers por si tu backend ya filtra usuarios también (opcional)
     const config = {
         headers: {
             'X-Rol': localStorage.getItem('usuario_rol'),
             'X-Org': localStorage.getItem('usuario_org')
         }
     }
-    // Si tu backend soporta filtrado, esto traerá solo tus usuarios.
-    // Si no, traerá todos y podríamos filtrarlos aquí en el front visualmente.
     const res = await axios.get(API_URL, config)
 
-    if (soySuperAdmin.value) {
-        usuarios.value = res.data;
-    } else {
-        // Filtrado visual extra por seguridad: Solo muestro los de mi organización
-        usuarios.value = res.data.filter(u => u.organizacion === miOrganizacion.value);
-    }
+    // FILTRADO DE SEGURIDAD CLIENT-SIDE
+    // Aunque el backend filtre, aseguramos visualmente que solo vea los suyos
+    usuarios.value = res.data.filter(u => u.organizacion === miOrganizacion.value);
 
   } catch (error) {
     console.error(error)
@@ -77,39 +56,21 @@ const cargarUsuarios = async () => {
 }
 
 const guardarUsuario = async () => {
-  // 1. Lógica de Organización
-  if (soySuperAdmin.value) {
-      // Si soy SuperAdmin
-      if (formUsuario.value.rol === 'Admin') {
-          formUsuario.value.organizacion = null; // Los Admins no tienen org
-      } else if (formUsuario.value.rol === 'Organizacion') {
-          // Si elijo manual
-          if (formUsuario.value.organizacion === 'OTRA') {
-              formUsuario.value.organizacion = organizacionManual.value;
-          }
-          if (!formUsuario.value.organizacion) return alert("Debes asignar una organización");
-      }
-  } else {
-      // Si soy Semi-Admin, FUERZO mi organización
-      formUsuario.value.organizacion = miOrganizacion.value;
-  }
+  // ASIGNACIÓN AUTOMÁTICA
+  formUsuario.value.organizacion = miOrganizacion.value;
 
   guardando.value = true
   try {
     if (formUsuario.value.id) {
-      // EDITAR (PUT)
       await axios.put(`${API_URL}/${formUsuario.value.id}`, formUsuario.value)
       alert('Usuario actualizado correctamente')
     } else {
-      // CREAR (POST) - Usamos el endpoint de creación
-      // Si tu endpoint de registro es diferente (ej: /api/Auth/Register), cámbialo aquí
       await axios.post(API_URL, formUsuario.value)
       alert('Usuario creado correctamente')
     }
     cerrarModal()
     cargarUsuarios()
   } catch (error) {
-    console.error(error)
     alert('Error al guardar: ' + (error.response?.data || error.message))
   } finally {
     guardando.value = false
@@ -117,41 +78,28 @@ const guardarUsuario = async () => {
 }
 
 const eliminarUsuario = async (id) => {
-  if(!confirm('¿Seguro que deseas eliminar este usuario?')) return
+  if(!confirm('¿Seguro que deseas eliminar este usuario de tu organización?')) return
   try {
     await axios.delete(`${API_URL}/${id}`)
     cargarUsuarios()
   } catch (error) {
-    console.error(error)
-    alert('Error eliminando el usuario')
+    alert('Error eliminando el usuario: ' + (error.response?.data || error.message))
   }
 }
 
 // --- MODALES ---
 const abrirModal = (usuario = null) => {
-  organizacionManual.value = '';
-
   if (usuario) {
-    // MODO EDICIÓN
     formUsuario.value = { ...usuario, password: '' }
-
-    // Si es SuperAdmin y la org es rara, la ponemos en manual
-    if (soySuperAdmin.value && usuario.organizacion && !listaOrganizaciones.includes(usuario.organizacion)) {
-        formUsuario.value.organizacion = 'OTRA';
-        organizacionManual.value = usuario.organizacion;
-    }
-
   } else {
-    // MODO CREAR
+    // CREAR NUEVO
     formUsuario.value = {
         id: 0,
         nombre: '',
         email: '',
         password: '',
-        // Si soy SuperAdmin sugiero crear Org, si no, sugiero Veterinario
-        rol: soySuperAdmin.value ? 'Organizacion' : 'Veterinario',
-        // Si soy SuperAdmin empiezo vacío, si no, pongo MI org
-        organizacion: soySuperAdmin.value ? '' : miOrganizacion.value
+        rol: 'Usuario', // Por defecto
+        organizacion: miOrganizacion.value // Ya lo asignamos por si acaso
     }
   }
   mostrarModal.value = true
@@ -159,25 +107,25 @@ const abrirModal = (usuario = null) => {
 
 const cerrarModal = () => mostrarModal.value = false
 
+// Navegación
+const volverAlPanel = () => router.push('/admin-org') // 👈 Vuelve a SU panel
 const cerrarSesion = () => {
   localStorage.clear();
   router.push('/')
 }
 
-const irAFincas = () => {
-  router.push('/admin')
-}
-
-// --- ON MOUNTED ---
 onMounted(() => {
-  // Leemos quién soy
   const rol = localStorage.getItem('usuario_rol');
   const org = localStorage.getItem('usuario_org');
-  miNombre.value = localStorage.getItem('usuario_nombre');
 
-  soySuperAdmin.value = (rol === 'Admin');
+  // Seguridad básica: Si intenta entrar un Super Admin aquí, lo mandamos a su vista correcta
+  if (rol === 'Admin') {
+      router.push('/usuarios'); // Vista de super admin
+      return;
+  }
+
   miOrganizacion.value = org || '';
-
+  miNombre.value = localStorage.getItem('usuario_nombre');
   cargarUsuarios()
 })
 </script>
@@ -189,19 +137,14 @@ onMounted(() => {
       <div class="d-flex align-items-center">
         <img src="/logo-cng.png" alt="Logo" class="logo-img me-3">
         <div>
-          <h2 class="page-title">Gestión de Usuarios</h2>
-          <div class="d-flex align-items-center gap-2">
-              <span class="badge" :class="soySuperAdmin ? 'bg-danger' : 'bg-success'">
-                  {{ soySuperAdmin ? 'SUPER ADMIN' : miOrganizacion }}
-              </span>
-              <small class="text-muted">Hola, {{ miNombre }}</small>
-          </div>
+          <h2 class="page-title">Usuarios de {{ miOrganizacion }}</h2>
+          <p class="subtitle">Gestión de personal operativo</p>
         </div>
       </div>
 
       <div class="d-flex gap-2">
-         <button @click="irAFincas" class="btn btn-outline-custom">
-           🌾 Ir a Fincas
+         <button @click="volverAlPanel" class="btn btn-outline-custom">
+           ⬅ Volver al Panel
          </button>
          <button @click="cerrarSesion" class="btn btn-danger btn-sm">
            Salir
@@ -211,7 +154,7 @@ onMounted(() => {
 
     <div class="control-panel shadow-sm d-flex justify-content-end mb-4">
       <button @click="abrirModal()" class="btn btn-primary-custom">
-        + Nuevo Usuario
+        + Registrar Nuevo Usuario
       </button>
     </div>
 
@@ -222,25 +165,22 @@ onMounted(() => {
             <th>Nombre</th>
             <th>Email</th>
             <th>Rol</th>
-            <th>Organización</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="usuarios.length === 0">
-              <td colspan="5" class="text-center py-5 text-muted">No hay usuarios registrados.</td>
+              <td colspan="4" class="text-center py-5 text-muted">
+                  No has registrado usuarios para {{ miOrganizacion }} todavía.
+              </td>
           </tr>
           <tr v-for="u in usuarios" :key="u.id">
             <td class="fw-bold text-dark-green">{{ u.nombre }}</td>
             <td>{{ u.email }}</td>
             <td>
-              <span class="badge" :class="u.rol === 'Admin' ? 'bg-danger' : 'bg-info text-dark'">
+              <span class="badge bg-info text-dark border border-info">
                 {{ u.rol }}
               </span>
-            </td>
-            <td>
-                <span v-if="u.organizacion" class="fw-bold text-success">{{ u.organizacion }}</span>
-                <span v-else class="text-muted small">-</span>
             </td>
             <td class="text-end">
               <button @click="abrirModal(u)" class="btn-icon">✏️</button>
@@ -254,7 +194,7 @@ onMounted(() => {
     <div v-if="mostrarModal" class="modal-backdrop">
       <div class="modal-card shadow-lg">
         <div class="modal-header-custom">
-          <h4 class="m-0">{{ formUsuario.id ? 'Editar Usuario' : 'Nuevo Usuario' }}</h4>
+          <h4 class="m-0">{{ formUsuario.id ? 'Editar Personal' : 'Nuevo Personal' }}</h4>
           <button @click="cerrarModal" class="close-btn">×</button>
         </div>
         <div class="modal-body-custom">
@@ -262,38 +202,23 @@ onMounted(() => {
 
             <div class="mb-3">
               <label class="form-label fw-bold small">Nombre Completo</label>
-              <input v-model="formUsuario.nombre" required class="form-control">
+              <input v-model="formUsuario.nombre" required class="form-control" placeholder="Ej: Juan Pérez">
             </div>
 
             <div class="mb-3">
               <label class="form-label fw-bold small">Correo Electrónico</label>
-              <input v-model="formUsuario.email" type="email" required class="form-control">
+              <input v-model="formUsuario.email" type="email" required class="form-control" placeholder="juan@ejemplo.com">
             </div>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label fw-bold small">Rol</label>
-                  <select v-model="formUsuario.rol" class="form-select">
-                    <option v-for="rol in rolesDisponibles" :key="rol" :value="rol">{{ rol }}</option>
-                  </select>
-                </div>
-
-                <div v-if="soySuperAdmin && formUsuario.rol !== 'Admin'" class="col-md-6 mb-3">
-                    <label class="form-label fw-bold small text-success">Organización</label>
-                    <select v-model="formUsuario.organizacion" class="form-select border-success">
-                        <option value="" disabled>Seleccione...</option>
-                        <option v-for="org in listaOrganizaciones" :key="org" :value="org">{{ org }}</option>
-                        <option value="OTRA">➕ Otra...</option>
-                    </select>
-                </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold small">Rol en la Empresa</label>
+              <select v-model="formUsuario.rol" class="form-select">
+                <option v-for="rol in rolesPermitidos" :key="rol" :value="rol">{{ rol }}</option>
+              </select>
             </div>
 
-            <div v-if="soySuperAdmin && formUsuario.organizacion === 'OTRA'" class="mb-3">
-                <input v-model="organizacionManual" class="form-control bg-light border-success" placeholder="Escribe el nombre de la organización..." required>
-            </div>
-
-            <div v-if="!soySuperAdmin" class="alert alert-info py-2 small mb-3">
-                <i class="me-2">ℹ️</i> El usuario será asignado a: <strong>{{ miOrganizacion }}</strong>
+            <div class="alert alert-success py-2 small mb-3">
+                <i class="me-2">🏢</i> Asignado automáticamente a: <strong>{{ miOrganizacion }}</strong>
             </div>
 
             <div class="mb-3">
@@ -305,7 +230,7 @@ onMounted(() => {
             <div class="modal-footer-custom mt-4 pt-3 border-top text-end">
               <button type="button" @click="cerrarModal" class="btn btn-secondary me-2">Cancelar</button>
               <button type="submit" :disabled="guardando" class="btn btn-primary-custom">
-                  {{ guardando ? 'Guardando...' : 'Guardar' }}
+                  {{ guardando ? 'Guardando...' : 'Guardar Datos' }}
               </button>
             </div>
           </form>
@@ -317,6 +242,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Estilos idénticos para mantener consistencia visual */
 :root { --color-primary: #1B5E20; --color-secondary: #F9A825; }
 .main-container { padding: 2rem; background-color: #f4f6f8; min-height: 100vh; }
 .header-section { background: white; padding: 1.5rem; border-radius: 8px; border-left: 5px solid #1B5E20; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
