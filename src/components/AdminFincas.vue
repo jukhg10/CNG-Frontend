@@ -1041,10 +1041,15 @@ onMounted(() => {
 
 .status-indicator { font-size: 0.9rem; font-weight: 500; }
 .dot {
-  height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px;
+  height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 6px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1); /* Borde sutil para colores claros */
 }
+
+.dot.censo { background-color: #FFECB3; }
 .dot.diagnostico { background-color: #F9A825; }
 .dot.implementacion { background-color: #2E7D32; }
+.dot.seguimiento { background-color: #1565C0; }
+.dot.inactivo { background-color: #B0BEC5; }
 
 .btn-icon {
   background: none; border: none; cursor: pointer; opacity: 0.7; font-size: 1.1rem;
