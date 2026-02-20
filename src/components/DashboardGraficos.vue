@@ -89,19 +89,14 @@ const dataInventario = computed(() => {
   let otros = 0;
 
   props.fincas.forEach(f => {
-    // 1. Detectamos la lista (puede venir como 'inventario' o 'Inventario')
     const listaAnimales = f.inventario || f.Inventario || [];
 
     if (listaAnimales.length > 0) {
         listaAnimales.forEach(item => {
-            // 2. Detectamos las propiedades internas (Backend suele usar Mayúsculas)
             const nombreCategoria = item.categoria || item.Categoria || '';
             const cantidad = item.cantidad || item.Cantidad || 0;
-
-            // Normalizamos a minúsculas para comparar
             const cat = nombreCategoria.toLowerCase();
 
-            // 3. Lógica de clasificación
             if (cat.includes('vaca') || cat.includes('toro') || cat.includes('novilla') || cat.includes('ternero') || cat.includes('ceba')) {
                 vacunos += cantidad;
             } else if (cat.includes('búfala') || cat.includes('bufalo') || cat.includes('bucerro')) {
@@ -129,13 +124,41 @@ const dataAreas = computed(() => {
     labels: ['Área Total Impactada (Ha)', 'Bosque Protegido (Ha)'],
     datasets: [{
       label: 'Hectáreas',
-      backgroundColor: ['#8D6E63', '#2E7D32'], // Café tierra y Verde bosque
+      backgroundColor: ['#8D6E63', '#2E7D32'],
       data: [kpis.value.totalArea, kpis.value.totalBosques]
     }]
   }
 });
 
-const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } };
+// --- CONFIGURACIONES SEPARADAS ---
+// 1. Opciones Generales (Para Doughnut y Bar)
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom' } }
+};
+
+// 2. Opciones Específicas para Radar (Fuerza la escala desde 0 y establece un máximo lógico)
+const radarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' } },
+  scales: {
+    r: {
+      angleLines: {
+        display: true
+      },
+      min: 0, // El centro siempre es 0
+
+      // 👇 AQUÍ ESTÁ LA SOLUCIÓN 👇
+      max: 20, // Cambia este "20" por la calificación MÁXIMA REAL de tus pilares (ej: 20, 50 o 100)
+
+      ticks: {
+          stepSize: 5 // Muestra las líneas guía de 5 en 5 (0, 5, 10, 15, 20)
+      }
+    }
+  }
+};
 </script>
 
 <template>
@@ -189,7 +212,7 @@ const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { 
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white fw-bold pt-3 border-0">🌱 Sostenibilidad (Pilares)</div>
                 <div class="card-body" style="height: 220px;">
-                    <Radar :data="dataPilares" :options="chartOptions" />
+                    <Radar :data="dataPilares" :options="radarOptions" />
                 </div>
             </div>
         </div>

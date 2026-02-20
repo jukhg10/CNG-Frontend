@@ -1154,7 +1154,7 @@ onMounted(() => {
 
   /* 5. Insertar el "Título" de la columna a la izquierda */
   .custom-table td::before {
-    content: attr(data-label); /* 👈 Lee el atributo HTML que pusimos arriba */
+    content: attr(data-label);
     font-weight: 700;
     color: #1B5E20;
     font-size: 0.85rem;
