@@ -62,6 +62,12 @@ import { ref } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2'; // ¡Importante para las alertas bonitas!
 
+// --- 👇 AQUÍ AGREGAMOS LA URL DINÁMICA ---
+const API_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api'
+  : 'https://cng-backend.azurewebsites.net/api';
+// ------------------------------------------
+
 // El estado reactivo de nuestro formulario
 const formulario = ref({
   nombre: '',
@@ -78,8 +84,8 @@ const enviarFormulario = async () => {
   cargando.value = true;
 
   try {
-    // Apuntamos al endpoint que acabamos de crear en C#
-    await axios.post('http://localhost:7292/api/Prospectos', formulario.value);
+    // 👇 Apuntamos al endpoint usando la variable API_URL
+    await axios.post(`${API_URL}/Prospectos`, formulario.value);
 
     // Mostramos la alerta de éxito con SweetAlert2
     Swal.fire({
