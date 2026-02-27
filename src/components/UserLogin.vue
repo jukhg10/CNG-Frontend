@@ -114,8 +114,13 @@ const login = async () => {
           </button>
         </form>
           <div class="mt-4 pt-3 border-top text-center">
-              <p class="small text-muted mb-2">¿No tienes cuenta? Visualiza el avance del proyecto:</p>
-              <button @click="$router.push('/estadisticas')" class="btn btn-outline-success w-100 fw-bold">
+              <p class="small text-muted mb-2">¿Quieres formar parte de nuestra plataforma?</p>
+              <button type="button" @click="$router.push('/contacto')" class="btn btn-success w-100 fw-bold mb-3 shadow-sm">
+                  🐮 Quiero contactarme
+              </button>
+
+              <p class="small text-muted mb-2">O visualiza el avance del proyecto:</p>
+              <button type="button" @click="$router.push('/estadisticas')" class="btn btn-outline-success w-100 fw-bold">
                   📊 Ver Estadísticas Públicas
               </button>
           </div>
