@@ -72,15 +72,20 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import Swal from 'sweetalert2'; // ¡Importante para la alerta de borrado!
+import Swal from 'sweetalert2';
+
+// 👇 AQUÍ ESTÁ LA MAGIA DE LA URL DINÁMICA 👇
+const API_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7292/api'
+  : 'https://cng-backend.azurewebsites.net/api';
 
 const prospectos = ref([]);
 const cargando = ref(true);
 
-// Llamamos a tu nuevo endpoint GET
+// Llamamos a tu endpoint GET usando la variable API_URL
 const cargarProspectos = async () => {
   try {
-    const respuesta = await axios.get('http://localhost:7292/api/Prospectos');
+    const respuesta = await axios.get(`${API_URL}/Prospectos`);
     prospectos.value = respuesta.data;
   } catch (error) {
     console.error("Error al cargar prospectos:", error);
@@ -110,7 +115,7 @@ const contactarWhatsApp = (prospecto) => {
   window.open(urlWa, '_blank');
 };
 
-// Lógica para eliminar un prospecto 🗑️
+// Lógica para eliminar un prospecto 🗑️ usando la variable API_URL
 const eliminarProspecto = async (id) => {
   const confirmacion = await Swal.fire({
     title: '¿Ya contactaste a esta persona?',
@@ -125,7 +130,7 @@ const eliminarProspecto = async (id) => {
 
   if (confirmacion.isConfirmed) {
     try {
-      await axios.delete(`http://localhost:7292/api/Prospectos/${id}`);
+      await axios.delete(`${API_URL}/Prospectos/${id}`);
 
       // Lo quitamos de la pantalla instantáneamente sin recargar
       prospectos.value = prospectos.value.filter(p => p.id !== id);
